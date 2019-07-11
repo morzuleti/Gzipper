@@ -16,32 +16,14 @@ namespace GZipper
             string compressedFile = "D://test/book.gz"; // сжатый файл
             string targetFile = "D://test/book_new.pdf"; // восстановленный файл
 
-            Read(sourceFile);
+           var readedBlocks = Read(sourceFile);
+           var result = Write(compressedFile, readedBlocks);
             // создание сжатого файла
-            Compress(sourceFile, compressedFile);
+            //  Compress(sourceFile, compressedFile);
             // чтение из сжатого файла
-            Decompress(compressedFile, targetFile);
-
+            //  Decompress(compressedFile, targetFile);
+            Console.WriteLine(result);
             Console.ReadLine();
-        }
-
-        private static void Compress(string sourceFile, string compressedFile)
-        {
-            // поток для чтения исходного файла
-            using (FileStream sourceStream = new FileStream(sourceFile, FileMode.OpenOrCreate))
-            {
-                // поток для записи сжатого файла
-                using (FileStream targetStream = File.Create(compressedFile))
-                {
-                    // поток архивации
-                    using (GZipStream compressionStream = new GZipStream(targetStream, CompressionMode.Compress))
-                    {
-                        sourceStream.CopyTo(compressionStream); // копируем байты из одного потока в другой
-                        Console.WriteLine("Сжатие файла {0} завершено. Исходный размер: {1}  сжатый размер: {2}.",
-                            sourceFile, sourceStream.Length.ToString(), targetStream.Length.ToString());
-                    }
-                }
-            }
         }
 
         private static byte[][] Read(string sourceFile)
@@ -53,12 +35,12 @@ namespace GZipper
                 length = sourceStream.Length;
                 countBlocks = length >> 20;
             }
-            byte[][] blocks = new byte[countBlocks+1][];
+            byte[][] blocks = new byte[countBlocks + 1][];
 
             int lastBlockLength = (int)(length % Constants.BlockLength);
             blocks[countBlocks] = new byte[lastBlockLength];
             var abdc = new BlockReader(sourceFile, (int)countBlocks, lastBlockLength);
-            abdc.ReadBlock(blocks[countBlocks]); 
+            abdc.ReadBlock(blocks[countBlocks]);
 
             for (int i = 0; i < countBlocks; i++)
             {
@@ -71,37 +53,19 @@ namespace GZipper
 
         private static int Write(string compressedFile, byte[][] sourceBytes)
         {
-            using (MemoryStream memStream = new MemoryStream())
+            using (FileStream targetStream = File.OpenWrite(compressedFile))
             {
-                using (FileStream targetStream = File.Create(compressedFile))
+                using (GZipStream compressionStream = new GZipStream(targetStream, CompressionMode.Compress))
                 {
-                    // поток архивации
-                    using (GZipStream compressionStream = new GZipStream(targetStream, CompressionMode.Compress))
+                    foreach (var block in sourceBytes)
                     {
-                        memStream.CopyTo(compressionStream); // копируем байты из одного потока в другой
+                        compressionStream.Write(block, 0, block.Length);
+                       
                     }
                 }
             }
 
             return 0;
-        }
-
-        private static void Decompress(string compressedFile, string targetFile)
-        {
-            // поток для чтения из сжатого файла
-            using (FileStream sourceStream = new FileStream(compressedFile, FileMode.OpenOrCreate))
-            {
-                // поток для записи восстановленного файла
-                using (FileStream targetStream = File.Create(targetFile))
-                {
-                    // поток разархивации
-                    using (GZipStream decompressionStream = new GZipStream(sourceStream, CompressionMode.Decompress))
-                    {
-                        decompressionStream.CopyTo(targetStream);
-                        Console.WriteLine("Восстановлен файл: {0}", targetFile);
-                    }
-                }
-            }
         }
     }
 }
