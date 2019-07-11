@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Threading;
 
 namespace GZipper
@@ -6,7 +7,7 @@ namespace GZipper
     class BlockReader
     {
         // создаем семафор
-        private static readonly Semaphore Sem = new Semaphore(Constants.ThreadCount, Constants.ThreadCount);
+        private static Semaphore Sem = new Semaphore(Constants.ThreadCount, Constants.ThreadCount);
         private readonly string _sourceFile;
         private readonly int _blockIndex;
         private readonly int _blockLength;
@@ -22,17 +23,18 @@ namespace GZipper
         {
             var myThread = new Thread(Read);
             myThread.Start(block);
+            myThread.Join(int.MaxValue);
         }
 
         private void Read(object blockObj)
         {
             Sem.WaitOne();
             var block = (byte[])blockObj;
-            using (var sourceStream = new FileStream(_sourceFile, FileMode.OpenOrCreate, FileAccess.Read,
+            using (var sourceStream = new FileStream(_sourceFile, FileMode.Open, FileAccess.Read,
                 FileShare.Read, 4048, true))
             {
                 sourceStream.Seek(_blockIndex * Constants.BlockLength, SeekOrigin.Begin);
-                sourceStream.Read(block, 0, _blockLength);
+               var rez = sourceStream.Read(block, 0, _blockLength);
             }
             Sem.Release();
         }

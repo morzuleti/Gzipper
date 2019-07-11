@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Threading;
 
 namespace GZipper
 {
@@ -16,6 +18,7 @@ namespace GZipper
         private readonly string _destFile;
         private readonly long _countBlocks;
         private readonly long _length;
+        static AutoResetEvent waitHandler = new AutoResetEvent(true);
 
         public MyGZipper(string sourceFile, string destFile)
         {
@@ -24,18 +27,23 @@ namespace GZipper
             using (var sourceStream = new FileStream(_sourceFile, FileMode.OpenOrCreate))
             {
                 _length = sourceStream.Length;
+                if (_length==0) throw new IOException("Cant read file");
                 _countBlocks = _length >> 20;
             }
         }
 
-        private IEnumerable<byte[]> Read()
+        private byte[][] Read()
         {
             var blocks = new byte[_countBlocks + 1][];
 
             var lastBlockLength = (int)(_length % Constants.BlockLength);
+            if (lastBlockLength != 0)
+            {
             blocks[_countBlocks] = new byte[lastBlockLength];
             var blockReader = new BlockReader(_sourceFile, (int)_countBlocks, lastBlockLength);
             blockReader.ReadBlock(blocks[_countBlocks]);
+            }
+
 
             for (int i = 0; i < _countBlocks; i++)
             {
@@ -46,18 +54,32 @@ namespace GZipper
             return blocks;
         }
 
-        private int Write(IEnumerable<byte[]> sourceBytes, Work action)
+        private byte[][] Zip(byte[][] blocks)
         {
-            using (var targetStream = File.OpenWrite(_destFile))
+            var blockZipper = new BlockZipper(blocks);
+            blockZipper.ZipBlocks();
+            return blocks;
+        }
+
+        private byte[][] UnZip(byte[][] blocks)
+        {
+            var blockZipper = new BlockZipper(blocks);
+            blockZipper.UnZipBlocks();
+            return blocks;
+        }
+
+        private int Write(byte[][] blocks)
+        {
+            var lastBlockLength = (int)(_length % Constants.BlockLength);
+            blocks[_countBlocks] = new byte[lastBlockLength];
+            var blockReader = new BlockWriter(_sourceFile, (int)_countBlocks, lastBlockLength);
+            blockReader.WriteBlock(blocks[_countBlocks]);
+
+            for (int i = 0; i < _countBlocks; i++)
             {
-                using (var compressionStream = new GZipStream(targetStream,
-                    action == Work.Zip ? CompressionMode.Compress : CompressionMode.Decompress))
-                {
-                    foreach (var block in sourceBytes)
-                    {
-                        compressionStream.Write(block, 0, block.Length);
-                    }
-                }
+                blocks[i] = new byte[Constants.BlockLength];
+                var reader = new BlockWriter(_sourceFile, i, Constants.BlockLength);
+                reader.WriteBlock(blocks[i]);
             }
 
             return 0;
@@ -69,9 +91,10 @@ namespace GZipper
             try
             {
                 var blocks = Read();
-                result = Write(blocks, Work.Zip);
+                var zippedBlocks = Zip(blocks);
+                result = Write(zippedBlocks);
             }
-            catch
+            catch (Exception e)
             {
                 result = 1;
             }
@@ -85,9 +108,10 @@ namespace GZipper
             try
             {
                 var blocks = Read();
-                result = Write(blocks, Work.Unzip);
+                var zippedBlocks = UnZip(blocks);
+                result = Write(zippedBlocks);
             }
-            catch
+            catch (Exception e)
             {
                 result = 1;
             }

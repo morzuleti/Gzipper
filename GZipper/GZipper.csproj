@@ -45,6 +45,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BlockReader.cs" />
+    <Compile Include="BlockWriter.cs" />
+    <Compile Include="BlockZiper.cs" />
     <Compile Include="Constants.cs" />
     <Compile Include="MyGZipper.cs" />
     <Compile Include="Program.cs" />

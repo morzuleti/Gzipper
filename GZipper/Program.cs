@@ -6,10 +6,20 @@ namespace GZipper
     {
         static void Main(string[] args)
         {
+            args = new string[3];
+            args[0] = Constants.Compress;
+            args[1] = @"D:\\test\book1.pdf";
+            args[2] = @"D:\\test\book.gz";
+            if (args.Length < 1)
+            {
+                Console.WriteLine("compress/decompress file1 file2 args needed");
+                Console.ReadKey();
+            }
+
             string zip = args[0].ToLower();
             if (!(zip == Constants.Compress || zip == Constants.Decompress))
             {
-                Console.WriteLine("Не верный способ обработки файла!");
+                Console.WriteLine("compress/decompress needed");
                 return;
             }
 
