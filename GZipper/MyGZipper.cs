@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace GZipper
 {
@@ -18,30 +14,30 @@ namespace GZipper
     {
         private readonly string _sourceFile;
         private readonly string _destFile;
+        private readonly long _countBlocks;
+        private readonly long _length;
 
         public MyGZipper(string sourceFile, string destFile)
         {
             _sourceFile = sourceFile;
             _destFile = destFile;
+            using (var sourceStream = new FileStream(_sourceFile, FileMode.OpenOrCreate))
+            {
+                _length = sourceStream.Length;
+                _countBlocks = _length >> 20;
+            }
         }
 
-        private byte[][] Read()
+        private IEnumerable<byte[]> Read()
         {
-            long countBlocks;
-            long length;
-            using (FileStream sourceStream = new FileStream(_sourceFile, FileMode.OpenOrCreate))
-            {
-                length = sourceStream.Length;
-                countBlocks = length >> 20;
-            }
-            byte[][] blocks = new byte[countBlocks + 1][];
+            var blocks = new byte[_countBlocks + 1][];
 
-            int lastBlockLength = (int)(length % Constants.BlockLength);
-            blocks[countBlocks] = new byte[lastBlockLength];
-            var blockReader = new BlockReader(_sourceFile, (int)countBlocks, lastBlockLength);
-            blockReader.ReadBlock(blocks[countBlocks]);
+            var lastBlockLength = (int)(_length % Constants.BlockLength);
+            blocks[_countBlocks] = new byte[lastBlockLength];
+            var blockReader = new BlockReader(_sourceFile, (int)_countBlocks, lastBlockLength);
+            blockReader.ReadBlock(blocks[_countBlocks]);
 
-            for (int i = 0; i < countBlocks; i++)
+            for (int i = 0; i < _countBlocks; i++)
             {
                 blocks[i] = new byte[Constants.BlockLength];
                 var reader = new BlockReader(_sourceFile, i, Constants.BlockLength);
@@ -50,11 +46,11 @@ namespace GZipper
             return blocks;
         }
 
-        private int Write(byte[][] sourceBytes, Work action)
+        private int Write(IEnumerable<byte[]> sourceBytes, Work action)
         {
-            using (FileStream targetStream = File.OpenWrite(_destFile))
+            using (var targetStream = File.OpenWrite(_destFile))
             {
-                using (GZipStream compressionStream = new GZipStream(targetStream,
+                using (var compressionStream = new GZipStream(targetStream,
                     action == Work.Zip ? CompressionMode.Compress : CompressionMode.Decompress))
                 {
                     foreach (var block in sourceBytes)

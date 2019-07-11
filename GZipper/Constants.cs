@@ -8,10 +8,10 @@ namespace GZipper
 {
     public static class Constants
     {
-        public static readonly int BlockLength = 1024 * 1024;
+        public const int BlockLength = 1024 * 1024;
+        public const string Compress = "compress";
+        public const string Decompress = "decompress";
         public static readonly int ThreadCount = Environment.ProcessorCount;
-        public static readonly string Compress = "Compress";
-        public static readonly string Decompress = "Decompress";
     }
 
     public enum Work 
