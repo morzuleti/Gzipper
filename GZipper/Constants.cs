@@ -10,5 +10,13 @@ namespace GZipper
     {
         public static readonly int BlockLength = 1024 * 1024;
         public static readonly int ThreadCount = Environment.ProcessorCount;
+        public static readonly string Compress = "Compress";
+        public static readonly string Decompress = "Decompress";
+    }
+
+    public enum Work 
+    {
+        Zip,
+        Unzip
     }
 }
