@@ -1,29 +1,40 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System.IO;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace GZipper
 {
     class BlockReader
     {
         // создаем семафор
-        static Semaphore sem = new Semaphore(3, 3);
+        static Semaphore sem = new Semaphore(Constants.ThreadCount, Constants.ThreadCount);
+        private readonly string _sourceFile;
+        private readonly int _blockIndex;
+        private readonly int _blockLength;
 
-        public BlockReader(char[] block)
+        public BlockReader(string sourceFile, int blockIndex, int blockLength)
         {
-            var myThread = new Thread(new ParameterizedThreadStart(Read));
+            _blockIndex = blockIndex;
+            _blockLength = blockLength;
+            _sourceFile = sourceFile;
+        }
+
+        public void ReadBlock(byte[] block)
+        {
+            var myThread = new Thread(Read);
             myThread.Start(block);
         }
 
-        private void Read(object block)
+        private void Read(object blockObj)
         {
-            var block1 = (char[]) block;
-                sem.WaitOne();
-
-                sem.Release();
+            sem.WaitOne();
+            var block = (byte[])blockObj;
+            using (var sourceStream = new FileStream(_sourceFile, FileMode.OpenOrCreate, FileAccess.Read,
+                FileShare.Read, 4048, true))
+            {
+                sourceStream.Seek(_blockIndex * Constants.BlockLength, SeekOrigin.Begin);
+                sourceStream.Read(block, 0, _blockLength);
+            }
+            sem.Release();
         }
     }
 }

@@ -10,8 +10,6 @@ namespace GZipper
 {
     class Program
     {
-        private const int BlockLength = 1024 * 1024;
-
         static void Main(string[] args)
         {
             string sourceFile = "D://test/book.pdf"; // исходный файл
@@ -48,29 +46,47 @@ namespace GZipper
 
         private static byte[][] Read(string sourceFile)
         {
-            using (FileStream sourceStream = new FileStream(sourceFile, FileMode.OpenOrCreate, FileAccess.Read,
-                FileShare.Read, 4048, true))
+            long countBlocks;
+            long length;
+            using (FileStream sourceStream = new FileStream(sourceFile, FileMode.OpenOrCreate))
             {
-                var lenth = sourceStream.Length;
-                var countBlocks = lenth >> 20;
-                
-                byte[][] blocks = new byte[++countBlocks][];
-                for (int i = 0; i < blocks.Length-1; i++)
-                {
-                    blocks[i] = new byte[BlockLength];
-                    sourceStream.Seek(i * BlockLength, SeekOrigin.Begin);
-                    sourceStream.Read(blocks[i], 0, BlockLength);
-                }
-
-                int lastBlockLength = (int)sourceStream.Length % BlockLength;
-                blocks[countBlocks-1] = new byte[lastBlockLength];
-                sourceStream.Read(blocks[countBlocks-1], 0, lastBlockLength);
-                return blocks;
+                length = sourceStream.Length;
+                countBlocks = length >> 20;
             }
+            byte[][] blocks = new byte[countBlocks+1][];
+
+            int lastBlockLength = (int)(length % Constants.BlockLength);
+            blocks[countBlocks] = new byte[lastBlockLength];
+            var abdc = new BlockReader(sourceFile, (int)countBlocks, lastBlockLength);
+            abdc.ReadBlock(blocks[countBlocks]); 
+
+            for (int i = 0; i < countBlocks; i++)
+            {
+                blocks[i] = new byte[Constants.BlockLength];
+                var abc = new BlockReader(sourceFile, i, Constants.BlockLength);
+                abc.ReadBlock(blocks[i]);
+            }
+            return blocks;
         }
 
+        private static int Write(string compressedFile, byte[][] sourceBytes)
+        {
+            using (MemoryStream memStream = new MemoryStream())
+            {
+                using (FileStream targetStream = File.Create(compressedFile))
+                {
+                    // поток архивации
+                    using (GZipStream compressionStream = new GZipStream(targetStream, CompressionMode.Compress))
+                    {
+                        memStream.CopyTo(compressionStream); // копируем байты из одного потока в другой
+                    }
+                }
+            }
 
-            private static void Decompress(string compressedFile, string targetFile)
+            return 0;
+        }
+
+        private static void Decompress(string compressedFile, string targetFile)
         {
             // поток для чтения из сжатого файла
             using (FileStream sourceStream = new FileStream(compressedFile, FileMode.OpenOrCreate))
