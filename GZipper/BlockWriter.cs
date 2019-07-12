@@ -8,13 +8,11 @@ namespace GZipper
         // создаем семафор
         private static readonly Semaphore Sem = new Semaphore(Constants.ThreadCount, Constants.ThreadCount);
         private readonly string _destFile;
-        private readonly int _blockIndex;
-        private readonly int _blockLength;
+        private readonly int _blockPoz;
 
-        public BlockWriter(string destFile, int blockIndex, int blockLength)
+        public BlockWriter(string destFile, int blockPoz)
         {
-            _blockIndex = blockIndex;
-            _blockLength = blockLength;
+            _blockPoz = blockPoz;
             _destFile = destFile;
         }
 
@@ -31,8 +29,8 @@ namespace GZipper
             using (var sourceStream = new FileStream(_destFile, FileMode.OpenOrCreate, FileAccess.Write,
                 FileShare.Write, 4048, true))
             {
-                sourceStream.Seek(_blockIndex * Constants.BlockLength, SeekOrigin.Begin);
-                sourceStream.Write(block, 0, _blockLength);
+                sourceStream.Seek(_blockPoz, SeekOrigin.Begin);
+                sourceStream.Write(block, 0, block.Length);
             }
             Sem.Release();
         }

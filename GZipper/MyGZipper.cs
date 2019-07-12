@@ -70,18 +70,14 @@ namespace GZipper
 
         private int Write(byte[][] blocks)
         {
-            var lastBlockLength = (int)(_length % Constants.BlockLength);
-            blocks[_countBlocks] = new byte[lastBlockLength];
-            var blockReader = new BlockWriter(_sourceFile, (int)_countBlocks, lastBlockLength);
-            blockReader.WriteBlock(blocks[_countBlocks]);
+            var pozition = 0;
 
-            for (int i = 0; i < _countBlocks; i++)
+            for (int i = 0; i <= _countBlocks; i++)
             {
-                blocks[i] = new byte[Constants.BlockLength];
-                var reader = new BlockWriter(_sourceFile, i, Constants.BlockLength);
-                reader.WriteBlock(blocks[i]);
+                var blockWriter = new BlockWriter(_destFile, pozition);
+                pozition += blocks[i].Length;
+                blockWriter.WriteBlock(blocks[i]);
             }
-
             return 0;
         }
 

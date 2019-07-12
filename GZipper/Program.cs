@@ -8,7 +8,7 @@ namespace GZipper
         {
             args = new string[3];
             args[0] = Constants.Compress;
-            args[1] = @"D:\\test\book1.pdf";
+            args[1] = @"D:\\test\book.pdf";
             args[2] = @"D:\\test\book.gz";
             if (args.Length < 1)
             {

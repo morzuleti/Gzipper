@@ -21,7 +21,6 @@ namespace GZipper
             {
                 var myThread = new Thread(Ziper);
                 myThread.Start(new Obertka(_blocks[i], i, Work.Zip));
-                myThread.Join(Int32.MaxValue);
             }
         }
 

@@ -23,7 +23,6 @@ namespace GZipper
         {
             var myThread = new Thread(Read);
             myThread.Start(block);
-            myThread.Join(int.MaxValue);
         }
 
         private void Read(object blockObj)
@@ -34,7 +33,7 @@ namespace GZipper
                 FileShare.Read, 4048, true))
             {
                 sourceStream.Seek(_blockIndex * Constants.BlockLength, SeekOrigin.Begin);
-               var rez = sourceStream.Read(block, 0, _blockLength);
+                sourceStream.Read(block, 0, _blockLength);
             }
             Sem.Release();
         }
