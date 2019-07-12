@@ -20,6 +20,7 @@ namespace GZipper
         {
             var myThread = new Thread(Write);
             myThread.Start(block);
+            myThread.Join(int.MaxValue);
         }
 
         private void Write(object blockObj)
