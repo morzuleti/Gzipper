@@ -29,7 +29,7 @@ namespace GZipper
             Sem.WaitOne();
             var block = (byte[])blockObj;
             using (var sourceStream = new FileStream(_sourceFile, FileMode.Open, FileAccess.Read,
-                FileShare.Read, 4048, true))
+                FileShare.Read, (int)Constants.BlockLength, true))
             {
                 sourceStream.Seek(_position, SeekOrigin.Begin);
                 sourceStream.Read(block, 0, block.Length);

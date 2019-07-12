@@ -1,6 +1,10 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace GZipper
@@ -37,7 +41,7 @@ namespace GZipper
         {
             Sem.WaitOne();
             var obertka = (Obertka)blockObj;
-            using (MemoryStream output = new MemoryStream(obertka.Array.Length))
+            using (MemoryStream output = new MemoryStream())
             {
                 if (obertka.Action == Work.Zip)
                 {
@@ -45,25 +49,42 @@ namespace GZipper
                 }
                 else
                 {
-                    UnzipIt(output, obertka);
+                   UnzipIt(output, obertka);
                 }
 
                 _blocks[obertka.Index] = output.ToArray();
+
             }
             Sem.Release();
         }
 
         private static void UnzipIt(MemoryStream output, Obertka obertka)
         {
-            using (GZipStream cs = new GZipStream(output, CompressionMode.Decompress))
+
+            using (var decompressionStream = new GZipStream(new MemoryStream(obertka.Array,0, obertka.Array.Length), CompressionMode.Decompress))
             {
-                cs.Read(obertka.Array, 0, obertka.Array.Length);
+                byte[] buffer = new byte[Constants.BlockLength];
+                using (MemoryStream memory = new MemoryStream())
+                {
+                    var count = 0;
+                    do
+                    {
+                        count = decompressionStream.Read(buffer, 0, (int)Constants.BlockLength);
+                        if (count > 0)
+                        {
+                            memory.Write(buffer, 0, count);
+                        }
+                    }
+                    while (count > 0);
+
+                    memory.CopyTo(output);
+                }
             }
         }
 
         private static void ZipIt(MemoryStream output, Obertka obertka)
         {
-            using (GZipStream cs = new GZipStream(output, CompressionMode.Compress))
+            using (GZipStream cs = new GZipStream(output, CompressionMode.Compress, false))
             {
                 cs.Write(obertka.Array, 0, obertka.Array.Length);
             }

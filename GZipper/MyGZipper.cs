@@ -19,7 +19,20 @@ namespace GZipper
         private readonly long _countBlocks;
         private readonly long _length;
         private static byte[][] _blocks;
-        static AutoResetEvent waitHandler = new AutoResetEvent(true);
+
+        private static readonly byte[] _headerBytes = new byte[10]
+        {
+            31,
+            139,
+            8,
+            0,
+            0,
+            0,
+            0,
+            0,
+            4,
+            0
+        };
 
         public MyGZipper(string sourceFile, string destFile)
         {
@@ -77,13 +90,13 @@ namespace GZipper
             {
                 var threadRead = new Thread(Read);
                 threadRead.Start();
-                threadRead.Join(int.MaxValue);
+                threadRead.Join(Int32.MaxValue);
                 var threadZip = new Thread(Zip);
                 threadZip.Start();
-                threadZip.Join(int.MaxValue);
+                threadZip.Join(Int32.MaxValue);
                 var threadWrite = new Thread(Write);
                 threadWrite.Start();
-                threadWrite.Join(int.MaxValue);
+                threadWrite.Join(Int32.MaxValue);
             }
             catch (Exception e)
             {
@@ -100,13 +113,13 @@ namespace GZipper
             {
                 var threadRead = new Thread(Read);
                 threadRead.Start();
-                threadRead.Join(int.MaxValue);
+                threadRead.Join(Int32.MaxValue);
                 var threadUnZip = new Thread(UnZip);
                 threadUnZip.Start();
-                threadUnZip.Join(int.MaxValue);
+                threadUnZip.Join(Int32.MaxValue);
                 var threadWrite = new Thread(Write);
                 threadWrite.Start();
-                threadWrite.Join(int.MaxValue);
+                threadWrite.Join(Int32.MaxValue);
             }
             catch (Exception e)
             {

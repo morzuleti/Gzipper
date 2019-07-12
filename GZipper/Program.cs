@@ -8,8 +8,8 @@ namespace GZipper
         {
             args = new string[3];
             args[0] = Constants.Compress;
-            args[1] = @"D:\\test\Hardstyle.mp4";
-            args[2] = @"D:\\test\Hardstyle.gz";
+            args[1] = @"D:\\test\book.pdf";
+            args[2] = @"D:\\test\book.gz";
             if (args.Length < 1)
             {
                 Console.WriteLine("compress/decompress file1 file2 args needed");
