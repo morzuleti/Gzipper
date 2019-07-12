@@ -21,7 +21,7 @@ namespace GZipper
         {
             var myThread = new Thread(Read);
             myThread.Start(block);
-            myThread.Join(int.MaxValue);
+            //myThread.Join(int.MaxValue);
         }
 
         private void Read(object blockObj)

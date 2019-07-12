@@ -52,11 +52,10 @@ namespace GZipper
             blockZipper.ZipBlocks();
         }
 
-        private byte[][] UnZip(byte[][] blocks)
+        private void UnZip()
         {
-            var blockZipper = new BlockZipper(blocks);
+            var blockZipper = new BlockZipper(_blocks);
             blockZipper.UnZipBlocks();
-            return blocks;
         }
 
         private void Write()
@@ -76,15 +75,15 @@ namespace GZipper
             int result = 0;
             try
             {
-                var myThread1 = new Thread(Read);
-                myThread1.Start();
-                myThread1.Join(int.MaxValue);
-                var myThread2 = new Thread(Zip);
-                myThread2.Start();
-                myThread2.Join(int.MaxValue);
-                var myThread = new Thread(Write);
-                myThread.Start();
-                myThread.Join(int.MaxValue);
+                var threadRead = new Thread(Read);
+                threadRead.Start();
+                threadRead.Join(int.MaxValue);
+                var threadZip = new Thread(Zip);
+                threadZip.Start();
+                threadZip.Join(int.MaxValue);
+                var threadWrite = new Thread(Write);
+                threadWrite.Start();
+                threadWrite.Join(int.MaxValue);
             }
             catch (Exception e)
             {
@@ -99,9 +98,15 @@ namespace GZipper
             int result=0;
             try
             {
-                //var blocks = Read();
-                //var zippedBlocks = UnZip(blocks);
-               // result = Write(zippedBlocks);
+                var threadRead = new Thread(Read);
+                threadRead.Start();
+                threadRead.Join(int.MaxValue);
+                var threadUnZip = new Thread(UnZip);
+                threadUnZip.Start();
+                threadUnZip.Join(int.MaxValue);
+                var threadWrite = new Thread(Write);
+                threadWrite.Start();
+                threadWrite.Join(int.MaxValue);
             }
             catch (Exception e)
             {
