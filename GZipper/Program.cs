@@ -7,9 +7,10 @@ namespace GZipper
         static void Main(string[] args)
         {
             args = new string[3];
-            args[0] = Constants.Compress;
-            args[1] = @"D:\\test\book.pdf";
-            args[2] = @"D:\\test\book.gz";
+            args[0] = Constants.Decompress;
+            args[1] = @"D:\\test\book.gz";
+            args[2] = @"D:\\test\book1.pdf";
+
             if (args.Length < 1)
             {
                 Console.WriteLine("compress/decompress file1 file2 args needed");

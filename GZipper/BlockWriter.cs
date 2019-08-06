@@ -1,4 +1,8 @@
-﻿using System.IO;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
 using System.Threading;
 
 namespace GZipper
@@ -6,9 +10,10 @@ namespace GZipper
     class BlockWriter
     {
         // создаем семафор
-        private static readonly Semaphore Sem = new Semaphore(Constants.ThreadCount, Constants.ThreadCount);
-        private readonly string _destFile;
+        private static  List<int> _endBytes  = new List<int>();
+        private static  string _destFile;
         private readonly int _blockPoz;
+        private static readonly Semaphore SemWrite = new Semaphore(1, 1);
 
         public BlockWriter(string destFile, int blockPoz)
         {
@@ -18,22 +23,47 @@ namespace GZipper
 
         public void WriteBlock(byte[] block)
         {
-            var myThread = new Thread(Write);
-            myThread.Start(block);
-            myThread.Join(int.MaxValue);
+           Write(block);
         }
 
-        private void Write(object blockObj)
+        private void Write(byte[] block)
         {
-            Sem.WaitOne();
-            var block = (byte[])blockObj;
+            SemWrite.WaitOne();
             using (var sourceStream = new FileStream(_destFile, FileMode.OpenOrCreate, FileAccess.Write,
                 FileShare.Write, 4048, true))
             {
                 sourceStream.Seek(_blockPoz, SeekOrigin.Begin);
                 sourceStream.Write(block, 0, block.Length);
+                _endBytes.Add(block.Length);
             }
-            Sem.Release();
+            SemWrite.Release();
+
+        }
+
+        public static void FinalizeFile()
+        {
+            using (var sourceStream = new FileStream(_destFile, FileMode.OpenOrCreate, FileAccess.Write,
+                FileShare.Write, 4048, true))
+            {
+                List<byte> delimeter = new List<byte>();
+                delimeter = Encoding.UTF8.GetBytes("Ё!~").ToList();
+                foreach (var val in _endBytes)
+                {
+                     List<byte> valToAppend = new List<byte>();
+                         valToAppend.AddRange(delimeter);
+                         valToAppend.AddRange(Encoding.UTF8.GetBytes(val.ToString())); 
+
+                     sourceStream.Seek(0, SeekOrigin.End);
+                   
+                    sourceStream.Write(valToAppend.ToArray(), 0, valToAppend.Count);
+                }
+
+                var countBlocks = BitConverter.GetBytes(_endBytes.Count);
+                
+
+                    sourceStream.Seek(0, SeekOrigin.End);
+                sourceStream.Write(countBlocks, 0, countBlocks.Length);
+            }
         }
     }
 }

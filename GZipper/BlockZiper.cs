@@ -5,103 +5,90 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices.ComTypes;
 using System.Threading;
 
 namespace GZipper
 {
-    public class BlockZipper
+
+
+    public interface IBlockZipper
     {
-        private byte[][] _blocks;
-        private static readonly Semaphore Sem = new Semaphore(Constants.ThreadCount, Constants.ThreadCount);
+        MemoryStream ZipBlock(byte[] blocks);
+        MemoryStream UnZipBlock(byte[] blocks);
+    }
 
-        public BlockZipper(byte[][] blocks)
+    public class BlockZipper : IBlockZipper
+    {
+        private static readonly Semaphore SemZip = new Semaphore(Constants.ThreadCount, Constants.ThreadCount);
+
+        public MemoryStream ZipBlock(byte[] blocks)
         {
-            _blocks = blocks;
+
+
+            return Ziper(new Data(blocks, Work.Zip));
+
         }
 
-        public void ZipBlocks()
+        public MemoryStream UnZipBlock(byte[] blocks)
         {
-            for (int i = 0; i < _blocks.Length; i++)
-            {
-                var myThread = new Thread(Ziper);
-                myThread.Start(new Obertka(_blocks[i], i, Work.Zip));
-            }
+            return Ziper(new Data(blocks, Work.Unzip));
         }
 
-        public void UnZipBlocks()
+        private MemoryStream Ziper (Data blockObj)
         {
-            for (int i = 0; i < _blocks.Length; i++)
-            {
-                var myThread = new Thread(Ziper);
-                myThread.Start(new Obertka(_blocks[i], i, Work.Unzip));
-            }
+            var output = blockObj.Action == Work.Zip ? ZipIt(blockObj) : UnzipIt(blockObj);
+            return output;
         }
 
-        private void Ziper(object blockObj)
+        private static MemoryStream UnzipIt(Data data)
         {
-            Sem.WaitOne();
-            var obertka = (Obertka)blockObj;
-            using (MemoryStream output = new MemoryStream())
+            using (var decompressionStream = new GZipStream(new MemoryStream(data.Array, 0, data.Array.Length), CompressionMode.Decompress))
             {
-                if (obertka.Action == Work.Zip)
-                {
-                    ZipIt(output, obertka);
-                }
-                else
-                {
-                   UnzipIt(output, obertka);
-                }
 
-                _blocks[obertka.Index] = output.ToArray();
-
-            }
-            Sem.Release();
-        }
-
-        private static void UnzipIt(MemoryStream output, Obertka obertka)
-        {
-
-            using (var decompressionStream = new GZipStream(new MemoryStream(obertka.Array,0, obertka.Array.Length), CompressionMode.Decompress))
-            {
                 byte[] buffer = new byte[Constants.BlockLength];
                 using (MemoryStream memory = new MemoryStream())
                 {
                     var count = 0;
                     do
                     {
-                        count = decompressionStream.Read(buffer, 0, (int)Constants.BlockLength);
+                        count = decompressionStream.Read(buffer, 0, buffer.Length);
                         if (count > 0)
                         {
                             memory.Write(buffer, 0, count);
                         }
                     }
                     while (count > 0);
-
-                    memory.CopyTo(output);
+                  return  memory;
                 }
             }
+
         }
 
-        private static void ZipIt(MemoryStream output, Obertka obertka)
+        private static MemoryStream ZipIt(Data data)
         {
+            SemZip.WaitOne();
+
+            MemoryStream output = new MemoryStream();
             using (GZipStream cs = new GZipStream(output, CompressionMode.Compress, false))
             {
-                cs.Write(obertka.Array, 0, obertka.Array.Length);
+                cs.Write(data.Array, 0, data.Array.Length);
             }
+            SemZip.Release();
+
+            return output;
         }
     }
 
-    public class Obertka
+    public class Data
     {
         public readonly byte[] Array;
-        public readonly int Index;
         public readonly Work Action;
 
 
-        public Obertka(byte[] array, int index, Work action)
+        public Data(byte[] array, Work action)
         {
             Array = array;
-            Index = index;
             Action = action;
         }
     }
