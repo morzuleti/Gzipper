@@ -10,8 +10,8 @@ namespace GZipper
     class BlockWriter
     {
         // создаем семафор
-        private static  List<int> _endBytes  = new List<int>();
-        private static  string _destFile;
+        private static List<int> _endBytes = new List<int>();
+        private static string _destFile;
         private readonly int _blockPoz;
         private static readonly Semaphore SemWrite = new Semaphore(1, 1);
 
@@ -23,7 +23,7 @@ namespace GZipper
 
         public void WriteBlock(byte[] block)
         {
-           Write(block);
+            Write(block);
         }
 
         private void Write(byte[] block)
@@ -42,27 +42,26 @@ namespace GZipper
 
         public static void FinalizeFile()
         {
-            using (var sourceStream = new FileStream(_destFile, FileMode.OpenOrCreate, FileAccess.Write,
+            using (var finalizeStream = new FileStream(_destFile, FileMode.OpenOrCreate, FileAccess.Write,
                 FileShare.Write, 4048, true))
             {
-                List<byte> delimeter = new List<byte>();
-                delimeter = Encoding.UTF8.GetBytes("Ё!~").ToList();
+                var delimiter = Encoding.UTF8.GetBytes(Constants.Separator).ToList();
                 foreach (var val in _endBytes)
                 {
-                     List<byte> valToAppend = new List<byte>();
-                         valToAppend.AddRange(delimeter);
-                         valToAppend.AddRange(Encoding.UTF8.GetBytes(val.ToString())); 
+                    List<byte> valToAppend = new List<byte>();
+                    valToAppend.AddRange(delimiter);
+                    valToAppend.AddRange(Encoding.UTF8.GetBytes(val.ToString()));
 
-                     sourceStream.Seek(0, SeekOrigin.End);
-                   
-                    sourceStream.Write(valToAppend.ToArray(), 0, valToAppend.Count);
+                    finalizeStream.Seek(0, SeekOrigin.End);
+
+                    finalizeStream.Write(valToAppend.ToArray(), 0, valToAppend.Count);
                 }
 
                 var countBlocks = BitConverter.GetBytes(_endBytes.Count);
-                
 
-                    sourceStream.Seek(0, SeekOrigin.End);
-                sourceStream.Write(countBlocks, 0, countBlocks.Length);
+
+                finalizeStream.Seek(0, SeekOrigin.End);
+                finalizeStream.Write(countBlocks, 0, countBlocks.Length);
             }
         }
     }

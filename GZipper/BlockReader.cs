@@ -6,12 +6,12 @@ namespace GZipper
     {
         // создаем семафор
         private readonly string _sourceFile;
-        private readonly long _position;
+        private readonly long _startPosition;
 
-        public BlockReader(string sourceFile, long position)
+        public BlockReader(string sourceFile, long startPosition)
         {
             _sourceFile = sourceFile;
-            _position = position;
+            _startPosition = startPosition;
         }
 
         public byte[] ReadBlock(int length = 0)
@@ -26,7 +26,7 @@ namespace GZipper
             using (var sourceStream = new FileStream(_sourceFile, FileMode.Open, FileAccess.Read,
                 FileShare.Read, length, true))
             {
-                sourceStream.Seek(_position, SeekOrigin.Begin);
+                sourceStream.Seek(_startPosition, SeekOrigin.Begin);
                 sourceStream.Read(block, 0, length);
             }
 

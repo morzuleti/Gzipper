@@ -8,8 +8,8 @@ namespace GZipper
         {
             args = new string[3];
             args[0] = Constants.Decompress;
-            args[1] = @"D:\\test\book.gz";
-            args[2] = @"D:\\test\book1.pdf";
+            args[1] = @"D:\\test\Hardstyle.gz";
+            args[2] = @"D:\\test\Hardstyle1.mp4";
 
             if (args.Length < 1)
             {
@@ -29,15 +29,24 @@ namespace GZipper
 
             IZipper zipper = new MyGZipper(sourceFile, resultFile);
             var result = 0;
-            switch (zip)
+            try
             {
-                case "compress":
-                    result = zipper.Zipping();
-                    break;
-                case "decompress":
-                    result = zipper.Unzip();
-                    break;
+                switch (zip)
+                {
+                    case "compress":
+                        result = zipper.Zip();
+                        break;
+                    case "decompress":
+                        result = zipper.Unzip();
+                        break;
+                }
             }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                result = 1;
+            }
+         
             Console.WriteLine(result);
             Console.ReadLine();
         }
