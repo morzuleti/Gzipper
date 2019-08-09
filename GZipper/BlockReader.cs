@@ -4,7 +4,6 @@ namespace GZipper
 {
     class BlockReader
     {
-        // создаем семафор
         private readonly string _sourceFile;
         private readonly long _startPosition;
 
@@ -24,13 +23,14 @@ namespace GZipper
         {
             var block = new byte[length];
             using (var sourceStream = new FileStream(_sourceFile, FileMode.Open, FileAccess.Read,
-                FileShare.Read, length, true))
+                FileShare.Read, length, false))
+            
             {
                 sourceStream.Seek(_startPosition, SeekOrigin.Begin);
                 sourceStream.Read(block, 0, length);
+                return block;
             }
 
-            return block;
         }
     }
 }

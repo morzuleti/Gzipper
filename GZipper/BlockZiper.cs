@@ -8,7 +8,7 @@ namespace GZipper
 
     public interface IBlockZipper
     {
-        Thread ZipBlock(object blockObj);
+        Thread TreatBlock(object blockObj);
     }
 
     public class BlockZipper : IBlockZipper
@@ -18,7 +18,7 @@ namespace GZipper
         public event SampleEventHandler ZippedEvent;
 
 
-        public Thread ZipBlock(object blockObj)
+        public Thread TreatBlock(object blockObj)
         {
             Thread myThread = new Thread(Zipper);
             myThread.Start(blockObj);

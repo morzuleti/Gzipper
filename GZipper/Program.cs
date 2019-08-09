@@ -6,10 +6,12 @@ namespace GZipper
     {
         static void Main(string[] args)
         {
+#if DEBUG
             args = new string[3];
             args[0] = Constants.Decompress;
             args[1] = @"D:\\test\Hardstyle.gz";
             args[2] = @"D:\\test\Hardstyle1.mp4";
+#endif
 
             if (args.Length < 1)
             {
@@ -17,8 +19,9 @@ namespace GZipper
                 Console.ReadKey();
             }
 
-            string zip = args[0].ToLower();
-            if (!(zip == Constants.Compress || zip == Constants.Decompress))
+            string zipAction = args[0].ToLower();
+            if (!(zipAction.Equals(Constants.Compress, StringComparison.OrdinalIgnoreCase) 
+                  || zipAction.Equals(Constants.Decompress, StringComparison.OrdinalIgnoreCase)))
             {
                 Console.WriteLine("compress/decompress needed");
                 return;
@@ -31,7 +34,7 @@ namespace GZipper
             var result = 0;
             try
             {
-                switch (zip)
+                switch (zipAction)
                 {
                     case "compress":
                         result = zipper.Zip();

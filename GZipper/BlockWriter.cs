@@ -13,7 +13,6 @@ namespace GZipper
         private static List<int> _endBytes = new List<int>();
         private static string _destFile;
         private readonly int _blockPoz;
-        private static readonly Semaphore SemWrite = new Semaphore(1, 1);
 
         public BlockWriter(string destFile, int blockPoz)
         {
@@ -28,22 +27,19 @@ namespace GZipper
 
         private void Write(byte[] block)
         {
-            SemWrite.WaitOne();
             using (var sourceStream = new FileStream(_destFile, FileMode.OpenOrCreate, FileAccess.Write,
-                FileShare.Write, 4048, true))
+                FileShare.Write, 4048, false))
             {
                 sourceStream.Seek(_blockPoz, SeekOrigin.Begin);
                 sourceStream.Write(block, 0, block.Length);
                 _endBytes.Add(block.Length);
             }
-            SemWrite.Release();
-
         }
 
         public static void FinalizeFile()
         {
             using (var finalizeStream = new FileStream(_destFile, FileMode.OpenOrCreate, FileAccess.Write,
-                FileShare.Write, 4048, true))
+                FileShare.Write, 4048, false))
             {
                 var delimiter = Encoding.UTF8.GetBytes(Constants.Separator).ToList();
                 foreach (var val in _endBytes)
@@ -56,10 +52,7 @@ namespace GZipper
 
                     finalizeStream.Write(valToAppend.ToArray(), 0, valToAppend.Count);
                 }
-
                 var countBlocks = BitConverter.GetBytes(_endBytes.Count);
-
-
                 finalizeStream.Seek(0, SeekOrigin.End);
                 finalizeStream.Write(countBlocks, 0, countBlocks.Length);
             }
