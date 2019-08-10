@@ -26,11 +26,16 @@ namespace GZipper
         {
             _sourceFile = sourceFile;
             _destFile = destFile;
-            using (var sourceStream = new FileStream(_sourceFile, FileMode.OpenOrCreate))
+            using (var sourceStream = new FileStream(_sourceFile, FileMode.Open))
             {
                 _totalLength = sourceStream.Length;
                 if (_totalLength == 0) throw new IOException("Cant read file");
                 _countBlocks = _totalLength >> 20;
+            }
+
+            if (File.Exists(destFile))
+            {
+                File.Delete(destFile);
             }
         }
 
@@ -63,7 +68,7 @@ namespace GZipper
                 _countBlocks = GetNumberOfBlocks(_sourceFile);
                 _countBigBlocks = (int)_countBlocks / Constants.BigBlockCount;
                 var blocksLength = ReadBlockLength(_sourceFile, _countBlocks, Encoding.UTF8, Constants.Separator).Select(int.Parse).ToArray();
-                for (int i = 0; i <= _countBigBlocks; i++)
+                for (var i = 0; i <= _countBigBlocks; i++)
                 {
                     DecompressZip(i, blocksLength);
                 }
@@ -88,7 +93,7 @@ namespace GZipper
         {
             long currentBlockToSkip = numCurrentBigBlock * Constants.BigBlockCount;
             long currentPosition = 0;
-            for (int i = 0; i < currentBlockToSkip; i++)
+            for (var i = 0; i < currentBlockToSkip; i++)
             {
                 currentPosition += blocksLength?[i]??Constants.BlockLength;
             }
@@ -110,7 +115,7 @@ namespace GZipper
             var threads = new Thread[_blocks.Length];
             for (var i = 0; i < _blocks.Length; i++)
             {
-                var blockZipper = new BlockZipper();
+                IBlockZipper blockZipper = new BlockZipper();
                 var data = new Data(_blocks[i], workToDo, i);
                 blockZipper.ZippedEvent += (sender, args) => { _blocks[args.IndexOfArray] = args.ZippedBytes; };
                 threads[i] = blockZipper.TreatBlock(data);
@@ -133,10 +138,10 @@ namespace GZipper
 
         private void WriteFile()
         {
-            for (int i = 0; i < _blocks.Length; i++)
+            foreach (var block in _blocks)
             {
                 var blockWriter = new BlockWriter(_destFile);
-                blockWriter.WriteBlock(_blocks[i]);
+                blockWriter.WriteBlock(block);
             }
         }
 
@@ -154,7 +159,7 @@ namespace GZipper
         private long GetNumberOfBlocks(string path)
         {
             var buffer = new byte[Constants.NumBytesAtCount];
-            using (FileStream fs = new FileStream(path, FileMode.Open))
+            using (var fs = new FileStream(path, FileMode.Open))
             {
                 fs.Seek(-Constants.NumBytesAtCount, SeekOrigin.End);
                 fs.Read(buffer, 0, buffer.Length);
@@ -164,17 +169,17 @@ namespace GZipper
             return count;
         }
 
-        private static IEnumerable<string> ReadBlockLength(string path, Int64 numberOfSeparators, Encoding encoding, string separator)
+        private static IEnumerable<string> ReadBlockLength(string path, long numberOfSeparators, Encoding encoding, string separator)
         {
             int sizeOfChar = encoding.GetByteCount("\n");
             byte[] buffer = encoding.GetBytes(separator);
 
-            using (FileStream fs = new FileStream(path, FileMode.Open))
+            using (var fs = new FileStream(path, FileMode.Open))
             {
-                Int64 foundSeparators = 0;
-                Int64 endPosition = fs.Length / sizeOfChar;
+                var foundSeparators = 0;
+                var endPosition = fs.Length / sizeOfChar;
 
-                for (Int64 position = sizeOfChar + Constants.NumBytesAtCount; position < endPosition; position += sizeOfChar)
+                for (var position = sizeOfChar + Constants.NumBytesAtCount; position < endPosition; position += sizeOfChar)
                 {
                     fs.Seek(-position, SeekOrigin.End);
                     fs.Read(buffer, 0, buffer.Length);

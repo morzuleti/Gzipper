@@ -4,18 +4,18 @@ using System.Threading;
 
 namespace GZipper
 {
-
+    public delegate void ZippedEventHandler(object sender, ZippingEventArgs e);
 
     public interface IBlockZipper
     {
         Thread TreatBlock(object blockObj);
+        event ZippedEventHandler ZippedEvent;
     }
 
     public class BlockZipper : IBlockZipper
     {
         private static readonly Semaphore SemZip = new Semaphore(Constants.ThreadCount, Constants.ThreadCount);
-        public delegate void SampleEventHandler(object sender, ZippingEventArgs e);
-        public event SampleEventHandler ZippedEvent;
+        public event ZippedEventHandler ZippedEvent;
 
 
         public Thread TreatBlock(object blockObj)
@@ -56,21 +56,6 @@ namespace GZipper
                 cs.Write(data.Array, 0, data.Array.Length);
             }
             return output.ToArray();
-        }
-    }
-
-    public class Data
-    {
-        public byte[] Array;
-        public readonly Work Action;
-        public int ArrayIndex;
-
-
-        public Data(byte[] array, Work action, int arrayIndex)
-        {
-            Array = array;
-            Action = action;
-            ArrayIndex = arrayIndex;
         }
     }
 }

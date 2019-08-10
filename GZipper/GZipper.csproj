@@ -48,6 +48,7 @@
     <Compile Include="BlockWriter.cs" />
     <Compile Include="BlockZiper.cs" />
     <Compile Include="Constants.cs" />
+    <Compile Include="Data.cs" />
     <Compile Include="MyGZipper.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
