@@ -17,8 +17,10 @@ namespace GZipper
     {
         private readonly string _sourceFile;
         private readonly string _destFile;
-        private readonly long _countBlocks;
+        private  long _countBlocks;
+        private int _countBigBlocks;
         private static byte[][] _blocks;
+        private readonly long _totalLength;
 
         public MyGZipper(string sourceFile, string destFile)
         {
@@ -26,9 +28,9 @@ namespace GZipper
             _destFile = destFile;
             using (var sourceStream = new FileStream(_sourceFile, FileMode.OpenOrCreate))
             {
-                var length = sourceStream.Length;
-                if (length == 0) throw new IOException("Cant read file");
-                _countBlocks = length >> 20;
+                _totalLength = sourceStream.Length;
+                if (_totalLength == 0) throw new IOException("Cant read file");
+                _countBlocks = _totalLength >> 20;
             }
         }
 
@@ -37,7 +39,12 @@ namespace GZipper
             int result = 0;
             try
             {
-                CompressZip();
+               _countBlocks ++;
+               _countBigBlocks = (int) _countBlocks / Constants.BigBlockCount;
+                for (var i = 0; i <= _countBigBlocks; i++)
+                {
+                    CompressZip(i);
+                }
             }
             catch (Exception e)
             {
@@ -53,7 +60,14 @@ namespace GZipper
             int result = 0;
             try
             {
-                DecompressZip();
+                _countBlocks = GetNumberOfBlocks(_sourceFile);
+                _countBigBlocks = (int)_countBlocks / Constants.BigBlockCount;
+                var blocksLength = ReadBlockLength(_sourceFile, _countBlocks, Encoding.UTF8, Constants.Separator).Select(int.Parse).ToArray();
+                for (int i = 0; i <= _countBigBlocks; i++)
+                {
+                    DecompressZip(i, blocksLength);
+                }
+              
             }
             catch (Exception e)
             {
@@ -63,29 +77,38 @@ namespace GZipper
             return result;
         }
 
-        private void CompressZip()
+        private void CompressZip(int numCurrentBlock)
         {
-            ReadBlocks((int)_countBlocks + 1);
-            ArchiveProcessing((int)_countBlocks + 1, Work.Zip);
-            WriteZip();
+            ReadBlocks(numCurrentBlock, numCurrentBlock == _countBigBlocks? (int)_countBlocks%Constants.BigBlockCount:Constants.BigBlockCount);
+            ArchiveProcessing(Work.Zip);
+            WriteZip(numCurrentBlock);
         }
 
-        private void ReadBlocks(int numberOfBlocks, int[] blocksLength = null)
+        private void ReadBlocks(int numCurrentBigBlock, int numberOfBlocks, int[] blocksLength = null)
         {
-            var currentPosition = 0;
+            long currentBlockToSkip = numCurrentBigBlock * Constants.BigBlockCount;
+            long currentPosition = 0;
+            for (int i = 0; i < currentBlockToSkip; i++)
+            {
+                currentPosition += blocksLength?[i]??Constants.BlockLength;
+            }
+
             _blocks = new byte[numberOfBlocks][];
-            for (int i = 0; i < numberOfBlocks; i++)
+            for (long i = 0; i < numberOfBlocks; i++)
             {
                 var reader = new BlockReader(_sourceFile, currentPosition);
-                _blocks[i] = reader.ReadBlock(blocksLength?[i] ?? 0);
+                var lastBlockLength = (int) (numCurrentBigBlock == _countBigBlocks && i == numberOfBlocks - 1
+                    ? _totalLength % Constants.BlockLength
+                    : 0);
+                _blocks[i] = reader.ReadBlock(blocksLength?[i+ currentBlockToSkip] ?? lastBlockLength);
                 currentPosition += _blocks[i].Length;
             }
         }
 
-        private static void ArchiveProcessing(int numberOfBlocks, Work workToDo)
+        private static void ArchiveProcessing(Work workToDo)
         {
-            var threads = new Thread[numberOfBlocks];
-            for (var i = 0; i < numberOfBlocks; i++)
+            var threads = new Thread[_blocks.Length];
+            for (var i = 0; i < _blocks.Length; i++)
             {
                 var blockZipper = new BlockZipper();
                 var data = new Data(_blocks[i], workToDo, i);
@@ -99,50 +122,36 @@ namespace GZipper
             }
         }
 
-        private void WriteZip()
+        private void WriteZip(int numCurrentBigBlock)
         {
             WriteFile();
-            BlockWriter.FinalizeFile();
+            if (numCurrentBigBlock==_countBigBlocks)
+            { 
+                BlockWriter.FinalizeFile();
+            }
         }
 
         private void WriteFile()
         {
-            var pozition = 0;
             for (int i = 0; i < _blocks.Length; i++)
             {
-                var blockWriter = new BlockWriter(_destFile, pozition);
+                var blockWriter = new BlockWriter(_destFile);
                 blockWriter.WriteBlock(_blocks[i]);
-                pozition += _blocks[i].Length;
             }
         }
 
-        private void DecompressZip()
+        private void DecompressZip(int numCurrentBigBlock, int[] blocksLength)
         {
-            var numberOfBlocks = GetNumberOfBlocks(_sourceFile);
-            var blocksLength = ReadBlockLength(_sourceFile, numberOfBlocks, Encoding.UTF8, Constants.Separator).Select(int.Parse).ToArray();
-            ReadBlocks(numberOfBlocks, blocksLength);
-            ArchiveProcessing(numberOfBlocks, Work.Unzip);
-            _blocks[numberOfBlocks - 1] = ClearEnd(_blocks[numberOfBlocks - 1]);
-            WriteFile();
+
+            var numberOfBlocks = numCurrentBigBlock == _countBigBlocks
+                ? _countBlocks % Constants.BigBlockCount
+                : Constants.BigBlockCount;
+             ReadBlocks(numCurrentBigBlock, (int)numberOfBlocks, blocksLength);
+             ArchiveProcessing(Work.Unzip);
+             WriteFile();
         }
 
-        private byte[] ClearEnd(byte[] initBytes)
-        {
-            for (int i = 5; i < initBytes.Length; i++)
-            {
-                if (initBytes[i - 5] == 0 && initBytes[i - 4] == 0 && initBytes[i - 3] == 0 && initBytes[i - 2] == 0 &&
-                    initBytes[i - 1] == 0 && initBytes[i] == 0)
-                {
-                    var eof = i - 5;
-                    byte[] result = new byte[initBytes.Length - eof];
-                    Array.Copy(initBytes, result, initBytes.Length - eof);
-                    return result;
-                }
-            }
-            return initBytes;
-        }
-
-        private int GetNumberOfBlocks(string path)
+        private long GetNumberOfBlocks(string path)
         {
             var buffer = new byte[Constants.NumBytesAtCount];
             using (FileStream fs = new FileStream(path, FileMode.Open))

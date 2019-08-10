@@ -6,6 +6,7 @@ namespace GZipper
     {
         public const long BlockLength = 1024 * 1024;
         public const long BufferLength = 1024 * 4;
+        public const int BigBlockCount =  1024;
         public const string Compress = "compress";
         public const string Decompress = "decompress";
         public static readonly int ThreadCount = Environment.ProcessorCount;
