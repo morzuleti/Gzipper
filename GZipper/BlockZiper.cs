@@ -38,7 +38,6 @@ namespace GZipper
         {
             using (var decompressionStream = new GZipStream(new MemoryStream(data.Array, 0, data.Array.Length), CompressionMode.Decompress))
             {
-
                 using (MemoryStream memory = new MemoryStream())
                 {
                     decompressionStream.CopyTo(memory);

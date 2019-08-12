@@ -166,6 +166,11 @@ namespace GZipper
             }
 
             var count = BitConverter.ToInt32(buffer, 0);
+            if (count > 32768)
+            {
+                throw new Exception("Не верный размер файла архива > 32768 Mb");
+            }
+
             return count;
         }
 
