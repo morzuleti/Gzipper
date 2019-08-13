@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 
 namespace GZipper
 {
@@ -13,7 +12,7 @@ namespace GZipper
                 ArgsHelper.CheckArgs(args);
                 var zipAction = args?[0]?.ToLower();
                 var sourceFile = args?[1]?.RemoveInvalidChars();
-                var resultFile = args?[2]?.RemoveInvalidChars(); ;
+                var resultFile = args?[2]?.RemoveInvalidChars(); 
 
                 IZipper zipper = new MyGZipper(sourceFile, resultFile);
                     switch (zipAction)

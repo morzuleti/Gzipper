@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -21,7 +20,6 @@ namespace GZipper
         private int _countBigBlocks;
         private static byte[][] _blocks;
         private readonly long _totalLength;
-
         public MyGZipper(string sourceFile, string destFile)
         {
             _sourceFile = sourceFile;
@@ -46,9 +44,10 @@ namespace GZipper
             {
                _countBlocks ++;
                _countBigBlocks = (int) _countBlocks / Constants.BigBlockCount;
+               var ioProcessor = new IoProcessor(_sourceFile, _destFile, _countBigBlocks, _totalLength);
                 for (var i = 0; i <= _countBigBlocks; i++)
                 {
-                    CompressZip(i);
+                    CompressZip(i, ioProcessor);
                 }
             }
             catch (Exception e)
@@ -65,12 +64,13 @@ namespace GZipper
             int result = 0;
             try
             {
-                _countBlocks = GetNumberOfBlocks(_sourceFile);
+                _countBlocks = ZipperHelper.GetNumberOfBlocks(_sourceFile);
                 _countBigBlocks = (int)_countBlocks / Constants.BigBlockCount;
-                var blocksLength = ReadBlockLength(_sourceFile, _countBlocks, Encoding.UTF8, Constants.Separator).Select(int.Parse).ToArray();
+                var ioProcessor = new IoProcessor(_sourceFile, _destFile, _countBigBlocks, _totalLength);
+                var blocksLength = ZipperHelper.ReadBlockLength(_sourceFile, _countBlocks, Encoding.UTF8, Constants.Separator).Select(int.Parse).ToArray();
                 for (var i = 0; i <= _countBigBlocks; i++)
                 {
-                    DecompressZip(i, blocksLength);
+                    DecompressZip(i, blocksLength, ioProcessor);
                 }
               
             }
@@ -82,32 +82,11 @@ namespace GZipper
             return result;
         }
 
-        private void CompressZip(int numCurrentBlock)
+        private void CompressZip(int numCurrentBlock, IIoProcessor ioProcessor)
         {
-            ReadBlocks(numCurrentBlock, numCurrentBlock == _countBigBlocks? (int)_countBlocks%Constants.BigBlockCount:Constants.BigBlockCount);
+            _blocks = ioProcessor.ReadBlocks(numCurrentBlock, numCurrentBlock == _countBigBlocks? (int)_countBlocks%Constants.BigBlockCount:Constants.BigBlockCount);
             ArchiveProcessing(Work.Zip);
-            WriteZip(numCurrentBlock);
-        }
-
-        private void ReadBlocks(int numCurrentBigBlock, int numberOfBlocks, int[] blocksLength = null)
-        {
-            long currentBlockToSkip = numCurrentBigBlock * Constants.BigBlockCount;
-            long currentPosition = 0;
-            for (var i = 0; i < currentBlockToSkip; i++)
-            {
-                currentPosition += blocksLength?[i]??Constants.BlockLength;
-            }
-
-            _blocks = new byte[numberOfBlocks][];
-            for (long i = 0; i < numberOfBlocks; i++)
-            {
-                var reader = new BlockReader(_sourceFile, currentPosition);
-                var lastBlockLength = (int) (numCurrentBigBlock == _countBigBlocks && i == numberOfBlocks - 1
-                    ? _totalLength % Constants.BlockLength
-                    : 0);
-                _blocks[i] = reader.ReadBlock(blocksLength?[i+ currentBlockToSkip] ?? lastBlockLength);
-                currentPosition += _blocks[i].Length;
-            }
+            WriteZip(numCurrentBlock, ioProcessor);
         }
 
         private static void ArchiveProcessing(Work workToDo)
@@ -127,84 +106,24 @@ namespace GZipper
             }
         }
 
-        private void WriteZip(int numCurrentBigBlock)
+        private void WriteZip(int numCurrentBigBlock, IIoProcessor ioProcessor)
         {
-            WriteFile();
-            if (numCurrentBigBlock==_countBigBlocks)
+            ioProcessor.WriteFile(_blocks);
+            if (numCurrentBigBlock == _countBigBlocks)
             { 
                 BlockWriter.FinalizeFile();
             }
         }
 
-        private void WriteFile()
-        {
-            foreach (var block in _blocks)
-            {
-                var blockWriter = new BlockWriter(_destFile);
-                blockWriter.WriteBlock(block);
-            }
-        }
-
-        private void DecompressZip(int numCurrentBigBlock, int[] blocksLength)
+        private void DecompressZip(int numCurrentBigBlock, int[] blocksLength , IIoProcessor ioProcessor)
         {
 
             var numberOfBlocks = numCurrentBigBlock == _countBigBlocks
                 ? _countBlocks % Constants.BigBlockCount
                 : Constants.BigBlockCount;
-             ReadBlocks(numCurrentBigBlock, (int)numberOfBlocks, blocksLength);
+             _blocks = ioProcessor.ReadBlocks(numCurrentBigBlock, (int)numberOfBlocks, blocksLength);
              ArchiveProcessing(Work.Unzip);
-             WriteFile();
-        }
-
-        private long GetNumberOfBlocks(string path)
-        {
-            var buffer = new byte[Constants.NumBytesAtCount];
-            using (var fs = new FileStream(path, FileMode.Open))
-            {
-                fs.Seek(-Constants.NumBytesAtCount, SeekOrigin.End);
-                fs.Read(buffer, 0, buffer.Length);
-            }
-
-            var count = BitConverter.ToInt32(buffer, 0);
-            if (count > 32768)
-            {
-                throw new Exception("Не верный размер файла архива > 32768 Mb");
-            }
-
-            return count;
-        }
-
-        private static IEnumerable<string> ReadBlockLength(string path, long numberOfSeparators, Encoding encoding, string separator)
-        {
-            int sizeOfChar = encoding.GetByteCount("\n");
-            byte[] buffer = encoding.GetBytes(separator);
-
-            using (var fs = new FileStream(path, FileMode.Open))
-            {
-                var foundSeparators = 0;
-                var endPosition = fs.Length / sizeOfChar;
-
-                for (var position = sizeOfChar + Constants.NumBytesAtCount; position < endPosition; position += sizeOfChar)
-                {
-                    fs.Seek(-position, SeekOrigin.End);
-                    fs.Read(buffer, 0, buffer.Length);
-                    if (encoding.GetString(buffer) == separator)
-                    {
-                        foundSeparators++;
-                        if (foundSeparators == numberOfSeparators)
-                        {
-                            var returnBuffer = new byte[fs.Length - fs.Position - Constants.NumBytesAtCount];
-                            fs.Read(returnBuffer, 0, returnBuffer.Length);
-                            var resultSting = encoding.GetString(returnBuffer);
-                            return resultSting.Split(new[] { separator }, StringSplitOptions.RemoveEmptyEntries);
-                        }
-                    }
-                }
-                var bytes = new byte[fs.Length - fs.Position];
-                fs.Read(bytes, 0, bytes.Length);
-                return encoding.GetString(bytes)
-                    .Split(new[] { separator }, StringSplitOptions.RemoveEmptyEntries);
-            }
+             ioProcessor.WriteFile(_blocks);
         }
     }
 }
