@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 
@@ -11,15 +14,18 @@ namespace GZipper
         int Zip();
         int Unzip();
     }
-
+    public delegate void ZippingFinished(byte[][] zippedBytes, int numCurrentBlock);
     public class MyGZipper : IZipper
     {
         private readonly string _sourceFile;
         private readonly string _destFile;
         private  long _countBlocks;
-        private int _countBigBlocks;
-        private static byte[][] _blocks;
+        private static int _countBigBlocks;
+        private static int _cacheSize = Constants.ThreadCount;
+        private static IIoProcessor _ioProcessor;
+        private static ZippingFinished _zippingFinished;
         private readonly long _totalLength;
+        private static object _lock = new object();
         public MyGZipper(string sourceFile, string destFile)
         {
             _sourceFile = sourceFile;
@@ -42,12 +48,14 @@ namespace GZipper
             int result = 0;
             try
             {
-               _countBlocks ++;
-               _countBigBlocks = (int) _countBlocks / Constants.BigBlockCount;
-               var ioProcessor = new IoProcessor(_sourceFile, _destFile, _countBigBlocks, _totalLength);
+                _countBlocks++;
+                _countBigBlocks = (int) _countBlocks / Constants.BigBlockCount;
+                _ioProcessor = new IoProcessor(_sourceFile, _destFile, _countBigBlocks, _totalLength);
+                _zippingFinished += WriteZip;
+
                 for (var i = 0; i <= _countBigBlocks; i++)
                 {
-                    CompressZip(i, ioProcessor);
+                    CompressZip(i);
                 }
             }
             catch (Exception e)
@@ -55,7 +63,6 @@ namespace GZipper
                 Console.WriteLine(e.Message);
                 result = 1;
             }
-
             return result;
         }
 
@@ -66,64 +73,82 @@ namespace GZipper
             {
                 _countBlocks = ZipperHelper.GetNumberOfBlocks(_sourceFile);
                 _countBigBlocks = (int)_countBlocks / Constants.BigBlockCount;
-                var ioProcessor = new IoProcessor(_sourceFile, _destFile, _countBigBlocks, _totalLength);
+                _ioProcessor = new IoProcessor(_sourceFile, _destFile, _countBigBlocks, _totalLength);
                 var blocksLength = ZipperHelper.ReadBlockLength(_sourceFile, _countBlocks, Encoding.UTF8, Constants.Separator).Select(int.Parse).ToArray();
+                _zippingFinished += WriteFile;
+                _cacheSize /= 2;
                 for (var i = 0; i <= _countBigBlocks; i++)
                 {
-                    DecompressZip(i, blocksLength, ioProcessor);
+                    DecompressZip(i, blocksLength);
                 }
-              
             }
             catch (Exception e)
             {
                 Console.WriteLine(e.Message);
                 result = 1;
             }
+          
             return result;
         }
 
-        private void CompressZip(int numCurrentBlock, IIoProcessor ioProcessor)
+        private void CompressZip(int numCurrentBlock)
         {
-            _blocks = ioProcessor.ReadBlocks(numCurrentBlock, numCurrentBlock == _countBigBlocks? (int)_countBlocks%Constants.BigBlockCount:Constants.BigBlockCount);
-            ArchiveProcessing(Work.Zip);
-            WriteZip(numCurrentBlock, ioProcessor);
+            var block = _ioProcessor.ReadBlocks(numCurrentBlock, numCurrentBlock == _countBigBlocks ? (int)_countBlocks % Constants.BigBlockCount : Constants.BigBlockCount);
+            ArchiveProcessing(block, numCurrentBlock, Work.Zip);
         }
 
-        private static void ArchiveProcessing(Work workToDo)
+        private static void ArchiveProcessing(byte[][]bigBlock,int numCurrentBlock, Work workToDo)
         {
-            var threads = new Thread[_blocks.Length];
-            for (var i = 0; i < _blocks.Length; i++)
+            for (var i = 0; i < bigBlock.Length; i++)
             {
                 IBlockZipper blockZipper = new BlockZipper();
-                var data = new Data(_blocks[i], workToDo, i);
-                blockZipper.ZippedEvent += (sender, args) => { _blocks[args.IndexOfArray] = args.ZippedBytes; };
-                threads[i] = blockZipper.TreatBlock(data);
-            }
-
-            foreach (var thread in threads)
-            {
-                thread.Join();
+                var data = new Data(bigBlock[i], workToDo, i);
+                blockZipper.ZippedEvent += (sender, args) => 
+                {
+                    bigBlock[args.IndexOfArray] = args.ZippedBytes;
+                    if (args.IndexOfArray == bigBlock.Length-1)
+                    {
+                        _zippingFinished?.Invoke(bigBlock, numCurrentBlock);
+                    }
+                };
+                blockZipper.TreatBlock(data);
             }
         }
 
-        private void WriteZip(int numCurrentBigBlock, IIoProcessor ioProcessor)
+
+        private void WriteZip(byte[][] bigBlock, int numCurrentBigBlock)
         {
-            ioProcessor.WriteFile(_blocks);
+            WriteFile(bigBlock, numCurrentBigBlock);
             if (numCurrentBigBlock == _countBigBlocks)
-            { 
+            {
                 BlockWriter.FinalizeFile();
             }
         }
 
-        private void DecompressZip(int numCurrentBigBlock, int[] blocksLength , IIoProcessor ioProcessor)
+        private  Dictionary <int,byte[][]> cache = new Dictionary<int,byte[][]>(_countBigBlocks/2);
+        private void WriteFile(byte[][] bigBlock, int numCurrentBigBlock)
+        {
+            Monitor.Enter(_lock);
+            cache.Add(numCurrentBigBlock, bigBlock);
+            if (cache.Count == _cacheSize || numCurrentBigBlock == _countBigBlocks)
+            {
+                foreach (var key in cache.Keys.OrderBy(val=>val))
+                {
+                    _ioProcessor.WriteFile(cache[key]);
+                }
+                cache.Clear();
+            }
+            Monitor.Exit(_lock);
+        }
+
+        private void DecompressZip(int numCurrentBigBlock, int[] blocksLength)
         {
 
             var numberOfBlocks = numCurrentBigBlock == _countBigBlocks
-                ? _countBlocks % Constants.BigBlockCount
+                ? (_countBlocks % Constants.BigBlockCount)==0?1: _countBlocks % Constants.BigBlockCount
                 : Constants.BigBlockCount;
-             _blocks = ioProcessor.ReadBlocks(numCurrentBigBlock, (int)numberOfBlocks, blocksLength);
-             ArchiveProcessing(Work.Unzip);
-             ioProcessor.WriteFile(_blocks);
+            var block = _ioProcessor.ReadBlocks(numCurrentBigBlock, (int)numberOfBlocks, blocksLength);
+             ArchiveProcessing(block, numCurrentBigBlock, Work.Unzip);
         }
     }
 }

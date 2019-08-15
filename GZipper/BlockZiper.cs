@@ -14,7 +14,7 @@ namespace GZipper
 
     public class BlockZipper : IBlockZipper
     {
-        private static readonly Semaphore SemZip = new Semaphore(Constants.ThreadCount, Constants.ThreadCount);
+        private static readonly Semaphore SemZip = new Semaphore(Constants.ThreadCount*2, Constants.ThreadCount*2);
         public event ZippedEventHandler ZippedEvent;
 
 
@@ -30,8 +30,8 @@ namespace GZipper
             SemZip.WaitOne();
             var data = (Data)blockObj;
             data.Array = data.Action == Work.Zip ? ZipIt(data) : UnzipIt(data);
-            SemZip.Release();
             ZippedEvent?.Invoke(this, new ZippingEventArgs(data.Array, data.ArrayIndex) );
+            SemZip.Release();
         }
 
         private static byte[] UnzipIt(Data data)

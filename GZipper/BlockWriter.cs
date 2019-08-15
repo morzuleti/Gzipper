@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 
 namespace GZipper
 {
@@ -10,6 +11,7 @@ namespace GZipper
     {
         private static List<int> _endBytes = new List<int>();
         private static string _destFile;
+        private static object _lockObj = new object();
 
         public BlockWriter(string destFile)
         {
@@ -33,6 +35,7 @@ namespace GZipper
 
         public static void FinalizeFile()
         {
+            Monitor.Enter(_lockObj);
             using (var finalizeStream = new FileStream(_destFile, FileMode.OpenOrCreate, FileAccess.Write,
                 FileShare.Write, 4048, false))
             {
@@ -51,6 +54,8 @@ namespace GZipper
                 finalizeStream.Seek(0, SeekOrigin.End);
                 finalizeStream.Write(countBlocks, 0, countBlocks.Length);
             }
+            Monitor.Exit(_lockObj);
+
         }
     }
 }

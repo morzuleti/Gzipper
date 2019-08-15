@@ -13,7 +13,6 @@
         private static int _countBigBlocks;
         private static long _totalLength;
 
-
         public IoProcessor(string sourceFile, string destFile, int countBigBlocks, long totalLength)
         {
             _sourceFile = sourceFile;
