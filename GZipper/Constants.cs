@@ -5,7 +5,7 @@ namespace GZipper
     public static class Constants
     {
         public const long BlockLength = 1024 * 1024;
-        public const int BigBlockCount =  1024;
+        public const int BigBlockCount =  256;
         public const string Compress = "compress";
         public const string Decompress = "decompress";
         public static readonly int ThreadCount = Environment.ProcessorCount;

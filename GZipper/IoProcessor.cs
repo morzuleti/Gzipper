@@ -2,8 +2,9 @@
 {
     public interface IIoProcessor
     {
-        byte[][] ReadBlocks(int numCurrentBigBlock, int numberOfBlocks, int[] blocksLength = null);
+        void ReadBlocks(int numCurrentBigBlock, int numberOfBlocks, int[] blocksLength = null);
         void WriteFile(byte[][] blocks);
+        event ReadDataProcessEventHandler ReadedEvent;
     }
 
     public class IoProcessor: IIoProcessor
@@ -12,6 +13,7 @@
         private static string _destFile;
         private static int _countBigBlocks;
         private static long _totalLength;
+        public event ReadDataProcessEventHandler ReadedEvent;
 
         public IoProcessor(string sourceFile, string destFile, int countBigBlocks, long totalLength)
         {
@@ -21,7 +23,7 @@
             _totalLength = totalLength;
         }
 
-        public byte[][] ReadBlocks(int numCurrentBigBlock, int numberOfBlocks, int[] blocksLength = null)
+        public void ReadBlocks(int numCurrentBigBlock, int numberOfBlocks, int[] blocksLength = null)
         {
             long currentBlockToSkip = numCurrentBigBlock * Constants.BigBlockCount;
             long currentPosition = 0;
@@ -40,8 +42,7 @@
                 blocks[i] = reader.ReadBlock(blocksLength?[i + currentBlockToSkip] ?? lastBlockLength);
                 currentPosition += blocks[i].Length;
             }
-
-            return blocks;
+            ReadedEvent.Invoke(this, new ReadDataProcessEventArgs(blocks, numCurrentBigBlock));
         }
 
         public void WriteFile(byte[][] blocks)

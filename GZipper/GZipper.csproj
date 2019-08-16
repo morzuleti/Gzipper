@@ -55,7 +55,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ZipperHelper.cs" />
-    <Compile Include="ZippingEventArgs.cs" />
+    <Compile Include="Events.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

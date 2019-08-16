@@ -19,7 +19,7 @@ namespace GZipper
     {
         private readonly string _sourceFile;
         private readonly string _destFile;
-        private  long _countBlocks;
+        private long _countBlocks;
         private static int _countBigBlocks;
         private static int _cacheSize = Constants.ThreadCount;
         private static IIoProcessor _ioProcessor;
@@ -49,8 +49,12 @@ namespace GZipper
             try
             {
                 _countBlocks++;
-                _countBigBlocks = (int) _countBlocks / Constants.BigBlockCount;
+                _countBigBlocks = (int)_countBlocks / Constants.BigBlockCount;
                 _ioProcessor = new IoProcessor(_sourceFile, _destFile, _countBigBlocks, _totalLength);
+                _ioProcessor.ReadedEvent += (sender, args) =>
+                {
+                    ArchiveProcessingZip(args.DataProcessed, args.IndexOfArray);
+                };
                 _zippingFinished += WriteZip;
 
                 for (var i = 0; i <= _countBigBlocks; i++)
@@ -74,9 +78,12 @@ namespace GZipper
                 _countBlocks = ZipperHelper.GetNumberOfBlocks(_sourceFile);
                 _countBigBlocks = (int)_countBlocks / Constants.BigBlockCount;
                 _ioProcessor = new IoProcessor(_sourceFile, _destFile, _countBigBlocks, _totalLength);
+                _ioProcessor.ReadedEvent += (sender, args) =>
+                {
+                    ArchiveProcessingUnZip(args.DataProcessed, args.IndexOfArray);
+                };
                 var blocksLength = ZipperHelper.ReadBlockLength(_sourceFile, _countBlocks, Encoding.UTF8, Constants.Separator).Select(int.Parse).ToArray();
                 _zippingFinished += WriteFile;
-                _cacheSize /= 2;
                 for (var i = 0; i <= _countBigBlocks; i++)
                 {
                     DecompressZip(i, blocksLength);
@@ -87,26 +94,35 @@ namespace GZipper
                 Console.WriteLine(e.Message);
                 result = 1;
             }
-          
+
             return result;
         }
 
         private void CompressZip(int numCurrentBlock)
         {
-            var block = _ioProcessor.ReadBlocks(numCurrentBlock, numCurrentBlock == _countBigBlocks ? (int)_countBlocks % Constants.BigBlockCount : Constants.BigBlockCount);
-            ArchiveProcessing(block, numCurrentBlock, Work.Zip);
+            _ioProcessor.ReadBlocks(numCurrentBlock, numCurrentBlock == _countBigBlocks ? (int)_countBlocks % Constants.BigBlockCount : Constants.BigBlockCount);
         }
 
-        private static void ArchiveProcessing(byte[][]bigBlock,int numCurrentBlock, Work workToDo)
+        private void ArchiveProcessingZip(byte[][] bigBlock, int numCurrentBlock)
+        {
+            ArchiveProcessing(bigBlock, numCurrentBlock, Work.Zip);
+        }
+
+        private void ArchiveProcessingUnZip(byte[][] bigBlock, int numCurrentBlock)
+        {
+            ArchiveProcessing(bigBlock, numCurrentBlock, Work.Unzip);
+        }
+
+        private static void ArchiveProcessing(byte[][] bigBlock, int numCurrentBlock, Work workToDo)
         {
             for (var i = 0; i < bigBlock.Length; i++)
             {
                 IBlockZipper blockZipper = new BlockZipper();
                 var data = new Data(bigBlock[i], workToDo, i);
-                blockZipper.ZippedEvent += (sender, args) => 
+                blockZipper.ZippedEvent += (sender, args) =>
                 {
-                    bigBlock[args.IndexOfArray] = args.ZippedBytes;
-                    if (args.IndexOfArray == bigBlock.Length-1)
+                    bigBlock[args.IndexOfArray] = args.DataProcessed;
+                    if (args.IndexOfArray == bigBlock.Length - 1)
                     {
                         _zippingFinished?.Invoke(bigBlock, numCurrentBlock);
                     }
@@ -119,24 +135,32 @@ namespace GZipper
         private void WriteZip(byte[][] bigBlock, int numCurrentBigBlock)
         {
             WriteFile(bigBlock, numCurrentBigBlock);
-            if (numCurrentBigBlock == _countBigBlocks)
+            if (_lastWritedBlock == _countBigBlocks)
             {
                 BlockWriter.FinalizeFile();
             }
         }
 
-        private  Dictionary <int,byte[][]> cache = new Dictionary<int,byte[][]>(_countBigBlocks/2);
+        private Dictionary<int, byte[][]> cache = new Dictionary<int, byte[][]>();
+        private int _lastWritedBlock = -1;
         private void WriteFile(byte[][] bigBlock, int numCurrentBigBlock)
         {
             Monitor.Enter(_lock);
             cache.Add(numCurrentBigBlock, bigBlock);
-            if (cache.Count == _cacheSize || numCurrentBigBlock == _countBigBlocks)
+
+            if (cache.Count == _cacheSize || _lastWritedBlock + 1 == _countBigBlocks)
             {
-                foreach (var key in cache.Keys.OrderBy(val=>val))
+                foreach (var key in cache.Keys.OrderBy(val => val))
                 {
+                    if (_lastWritedBlock + 1 != key)
+                    {
+                        break;
+                    }
+
                     _ioProcessor.WriteFile(cache[key]);
+                    _lastWritedBlock = key;
+                    cache.Remove(key);
                 }
-                cache.Clear();
             }
             Monitor.Exit(_lock);
         }
@@ -145,10 +169,9 @@ namespace GZipper
         {
 
             var numberOfBlocks = numCurrentBigBlock == _countBigBlocks
-                ? (_countBlocks % Constants.BigBlockCount)==0?1: _countBlocks % Constants.BigBlockCount
+                ? (_countBlocks % Constants.BigBlockCount) == 0 ? 1 : _countBlocks % Constants.BigBlockCount
                 : Constants.BigBlockCount;
-            var block = _ioProcessor.ReadBlocks(numCurrentBigBlock, (int)numberOfBlocks, blocksLength);
-             ArchiveProcessing(block, numCurrentBigBlock, Work.Unzip);
+            _ioProcessor.ReadBlocks(numCurrentBigBlock, (int)numberOfBlocks, blocksLength);
         }
     }
 }

@@ -9,6 +9,12 @@ namespace GZipper
             var result = 0;
             try
             {
+                args = new string[3];
+                args[0] = Constants.Decompress;
+                args[1] = @"C:\test\kino.gz";
+                args[2] = @"D:\test\kino1.mkv";
+
+
                 ArgsHelper.CheckArgs(args);
                 var zipAction = args?[0]?.ToLower();
                 var sourceFile = args?[1]?.RemoveInvalidChars();
