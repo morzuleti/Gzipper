@@ -14,7 +14,6 @@ namespace GZipper
 
     public class BlockZipper : IBlockZipper
     {
-        private static readonly Semaphore SemZip = new Semaphore(Constants.ThreadCount*2, Constants.ThreadCount*2);
         public event DataProcessEventHandler ZippedEvent;
 
 
